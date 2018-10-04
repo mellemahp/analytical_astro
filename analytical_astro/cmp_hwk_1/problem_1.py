@@ -12,6 +12,7 @@ velocity of the spacecraft at an arbitrary time t.
 """
 import numpy as np
 import math
+from scipy.optimize import newton
 
 class Cartesian_State(object):
     """Stores parameters for cartesian state and methods for state conversion and propagation
@@ -56,10 +57,10 @@ class Cartesian_State(object):
         radius = np.linalg.norm(self.pos)
         velocity = np.linalg.norm(self.vel)
         v_radial = np.dot(self.pos, self.vel) / radius
-        h_vec = np.cross(radius, velocity)
+        h_vec = np.cross(self.pos, self.vel)
         h = np.linalg.norm(h_vec)
         incl = math.acos(h_vec[2] / h)
-        node_vec = np.cross(np.array([0, 0, 1], h_vec))
+        node_vec = np.cross(np.array([0, 0, 1]), h_vec)
         node_mag = np.linalg.norm(node_vec)
         if node_vec[1] >= 0:
             raan = math.acos(node_vec[0] / node_mag)
@@ -71,9 +72,9 @@ class Cartesian_State(object):
         if ecc_vec[2] >= 0:
             arg_peri = math.acos(node_vec / node_mag * ecc_vec / ecc)
         else:
-            arg_peri = 2 * np.pi - math.acos(node_vec / node_mag * ecc_vec / ecc)
+            arg_peri = 2 * np.pi - math.acos(np.dot(node_vec / node_mag , ecc_vec / ecc))
         if v_radial >= 0:
-            true_anomaly = math.acos(ecc_vec / ecc * self.pos / radius)
+            true_anomaly = math.acos(np.dot(ecc_vec / ecc, self.pos / radius))
         else:
             true_anomaly = 2 * np.pi * math.acos(ecc_vec / ecc * self.pos / radius)
             
@@ -103,6 +104,8 @@ class Keplerian_State(object):
         self.true_anom = true_anom
         self.mu = mu
         self.time = time
+        self.a = self.h**2 / (self.mu * (1 - self.ecc))
+        self.n = math.sqrt(self.mu / self.a**3)
         
     @property
     def eccentric_anomaly(self):
@@ -119,7 +122,7 @@ class Keplerian_State(object):
         try:
             return self._mean_anom
         except AttributeError:
-            self._mean_anom = self._ecc_anom - self.ecc * math.sin(self._ecc_anom)
+            self._mean_anom = self.eccentric_anomaly - self.ecc * math.sin(self.eccentric_anomaly)
             return self._mean_anom
         
     @property
@@ -128,7 +131,7 @@ class Keplerian_State(object):
         try:
             return self._ts_peri
         except AttributeError:
-            self._ts_peri = self.mean_anomaly * self.radius**(3 / 2) / math.sqrt(self.mu)
+            self._ts_peri = self.mean_anomaly * self.radius**(3 / 2) / math.sqrt(self.a**3 / self.mu)
             return self._ts_peri
         
     def to_cart_state(self):
@@ -138,7 +141,17 @@ class Keplerian_State(object):
     def propagate(self, new_time):
         """ """ 
         delta_t = new_time - self.time
-        
+        new_mean_anom = self.n * (new_time - self.ts_peri)
+
+        def kep_eq_solver(E): 
+            return  - E + self.ecc * math.sin(E)
+
+        # solves using newton's method with mean anomaly as initial guess
+        E_new = newton(kep_eq_solver, new_mean_anom)
+
+        ta_new = math.acos((math.cos(E_new) - self.ecc) / (1 - self.ecc * math.cos(E_new)))
+
+        r_new = self.h**2 / self.mu * 1 / ( 1 + self.ecc * math.cos(ta_new))
         
         return Keplerian_State(r_new, self.h, self.incl, self.raan, self.ecc,
-                               self.arg_peri, new_ta, self.mu, new_time)
+                               self.arg_peri, ta_new, self.mu, new_time)
