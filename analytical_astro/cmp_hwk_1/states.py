@@ -13,6 +13,7 @@ velocity of the spacecraft at an arbitrary time t.
 import numpy as np
 import math
 from scipy.optimize import newton
+from scipy.integrate import odeint
 
 class Cartesian_State(object):
     """Stores parameters for cartesian state and methods for state conversion and propagation
@@ -29,7 +30,6 @@ class Cartesian_State(object):
         self.time = time # epoch 
         self.pos = pos #km 
         self.vel = vel #km/sec
-
         
     def __add__(self, other_state):
         """ Adds two Cartesian states together. Returns a state representing the result
@@ -81,9 +81,28 @@ class Cartesian_State(object):
         return Keplerian_State(radius, h, incl, raan, ecc, arg_peri,
                                true_anomaly, self.mu, self.time)
     
-    def propagate(self, delta_t):
-        #return Cartesian_State(self.mu, self.time, x_new, y_new, z_new)
-        pass
+    def propagate(self, times):
+        delta_ts = times - self.time
+
+        # initial conditions
+        q0 = np.concatenate((self.pos, self.vel))
+        mu = self.mu
+        def diff_eq(q, t):
+            dstate_dt = [q[3], q[4], q[5],
+                         -mu * q[0] / np.linalg.norm(q[0:3]),
+                         -mu * q[1] / np.linalg.norm(q[0:3]),
+                         -mu * q[2] / np.linalg.norm(q[0:3])]
+            return dstate_dt
+            
+        m = odeint(diff_eq, q0, delta_ts)
+
+        print(m)
+        
+        #pos_new = np.array([x_new, y_new, z_new])
+        #vel_new = np.array([vx_new, vy_new, vz_new])
+
+        #return Cartesian_State(pos_new, vel_new, self.mu, t_next)
+        
     
     
 class Keplerian_State(object):
