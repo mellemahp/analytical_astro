@@ -97,7 +97,6 @@ class Cartesian_State(object):
 
         Returns: 
         (Cartesian_State): new cartesian state at new time 
-
         """
         delta_ts = np.linspace(0, time_new - self.time, num=(20 * (time_new - self.time)))
 
@@ -200,16 +199,72 @@ class Keplerian_State(object):
         except AttributeError:
             self._nrg = - self.mu / (2 * self.a)
             return self._nrg
-        
-    def to_cart_state(self):
-        """ Converts this state to a cartesian state
+    
+    @property
+    def cart_pos(self):
+        """ Gives the cartesian position vector of the Keplerian_State in inertial coords
         
         Returns: 
-        (Cartesian_State)
+        (numpy.array(float)): coordinate vector of state position (km)
         """
-        print("Method not implemented")
+        try:
+            return self._cart_pos
+        except AttributeError:
+            self._cart_pos = np.matmul(self.q_matrix(), self.perifocal_pos())
+            return self._cart_vel
+
+    @property
+    def cart_vel(self):
+        """ Gives the cartesian velocity vector of the Keplerian_State in inertial coords
+        
+        Returns: 
+        (numpy.array(float)): coordinate vector of state velocity (km/sec)
+        """
+        try:
+            return self._cart_vel
+        except AttributeError:
+            self._cart_vel = np.matmul(self.q_matrix(), self.perifocal_vel())
         pass 
     
+    def q_matrix(self):
+        """ Calculates q matrix for converting from perifocal coordinates to inertial coordinates
+
+        returns: 
+        (numpy.Matrix)
+        """
+        q = np.matrix([[-math.sin(self.raan) * math.cos(self.incl) * math.sin(self.arg_peri) + math.cos(self.raan) * \
+                        math.cos(self.arg_peri),
+                        -math.sin(self.raan) * math.cos(self.incl) * math.cos(self.arg_peri) -  math.cos(self.raan) * \
+                        math.sin(self.arg_peri),
+                        math.sin(self.raan) * math.sin(self.incl)],
+                       [math.cos(self.raan) * math.cos(self.incl) * math.sin(self.arg_peri) + math.sin(self.raan) * \
+                        math.cos(self.arg_peri),
+                        math.cos(self.raan) * math.cos(self.incl) * math.cos(self.arg_peri) - math.sin(self.raan) * \
+                        math.sin(self.arg_peri),
+                        -math.cos(self.raan) * math.sin(self.incl)],
+                       [math.sin(self.incl) * math.sin(self.arg_peri),
+                        math.sin(self.incl) * math.cos(self.arg_peri),
+                        math.cos(self.incl)]])
+        return q 
+    
+    def perifocal_pos(self):
+        """ Finds position in perifocal coordinate frame
+        
+        Returns: 
+        (numpy.array(float)): position 3-vector in perifocal frame
+        """
+        pos = self.radius * np.array([math.cos(self.true_anom), math.sin(self.true_anom), 0])
+        return pos
+
+    def perifocal_vel(self):
+        """ Finds velocity in perifocal coordinate frame
+        
+        Returns: 
+        (numpy.array(float)): velocity 3-vector in perifocal frame
+        """
+        vel = self.mu / self.h * np.array([-math.sin(self.true_anom), self.ecc + math.cos(self.true_anom), 0])
+        return vel
+        
     def propagate(self, new_time):
         """ Propagates the state up to the specified time
 
