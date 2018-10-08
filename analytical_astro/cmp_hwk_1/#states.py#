@@ -111,7 +111,7 @@ class Cartesian_State(object):
         return Keplerian_State(radius, h, incl, raan, ecc, arg_peri,
                                true_anomaly, self.mu, self.time)
     
-    def propagate(self, time_new, spacing=10):
+    def propagate(self, time_new, spacing=100):
         """ Propagates state forward (or backwards) in time to new time
         
         Args: 

@@ -11,7 +11,22 @@ Note: the first algorithm used here is taken from "Lambert's Problem" by Kate Da
 import numpy as np
 import math
 
-class LambertSolver(object):
+class LamberSolverCartesian(object):
+    """ """ 
+    def __init__(self, initial_state, final_state):
+        if not isinstance(initial_state, 'Cartesian_State') or not isinstance(final_state, 'Cartesian_State'):
+            raise TypeError("The Lambert Cartesian Solver can only accept Cartesian_State objects")
+        if not initial_state.mu == final_state.mu:
+            raise ValueError("Both states MUST have the same gravitaional parameter: mu")
+
+        self.i_state = initial_state
+        self.f_state = final_state
+
+    def solve(self, delta_t_0):
+        x=1
+        
+
+class LambertSolverKeplerian(object):
     """ Initializes a labert solver with a starting state and ending state to use for computing a transfer
 
     Args:
