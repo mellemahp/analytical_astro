@@ -106,16 +106,16 @@ class Cartesian_State(object):
         elif v_radial >= 0:
             true_anomaly = math.acos(np.dot(ecc_vec / ecc, self.pos / radius))
         else:
-            true_anomaly = 2 * np.pi * math.acos(ecc_vec / ecc * self.pos / radius)
+            true_anomaly = 2 * np.pi * math.acos(np.dot(ecc_vec / ecc, self.pos / radius))
             
         return Keplerian_State(radius, h, incl, raan, ecc, arg_peri,
                                true_anomaly, self.mu, self.time)
     
-    def propagate(self, time_new, spacing=10):
+    def propagate(self, time_new, spacing=100):
         """ Propagates state forward (or backwards) in time to new time
         
         Args: 
-        time_new (float): new time a
+        time_new (float): new time to propagate to 
 
         Returns: 
         (Cartesian_State): new cartesian state at new time 
@@ -251,7 +251,17 @@ class Keplerian_State(object):
         except AttributeError:
             self._cart_vel = np.asarray(np.matmul(self.q_matrix(), self.perifocal_vel()))[0]
             return self._cart_vel 
-    
+
+    @property
+    def period(self):
+        """ Computes the orbital period of the satellite (assumes elliptical orbit) 
+
+        Returns: 
+        (float): orbit period (seconds)
+        """
+        return 2 * np.pi / math.sqrt(self.mu) * math.sqrt(self.a**3)
+
+        
     def q_matrix(self):
         """ Calculates q matrix for converting from perifocal coordinates to inertial coordinates
 
@@ -305,7 +315,7 @@ class Keplerian_State(object):
         """
         if ecc != 0:
             raise ValueError("This method ONLY works for ECC = 0!")
-        mean_anomaly = self.n * (new_time - self.time)
+        mean_anomaly = self.n * (new_time - self.ts_peri)
 
         new_state = self.copy()
         new_state.true_anom = mean_anomaly
@@ -339,10 +349,6 @@ class Keplerian_State(object):
         # re-calculate true anomaly and radius at new time
         ta_new = 2 * math.atan2(math.tan(E_new / 2) , math.sqrt((1 - self.ecc) / (1 + self.ecc)))
 
-        
-        #ta_new = math.acos((math.cos(E_new) - self.ecc) / (1 - self.ecc * math.cos(E_new)))
-
-        
         r_new = self.h**2 / self.mu * 1 / ( 1 + self.ecc * math.cos(ta_new))
         
         return Keplerian_State(r_new, self.h, self.incl, self.raan, self.ecc,

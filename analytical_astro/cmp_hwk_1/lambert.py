@@ -10,20 +10,109 @@ Note: the first algorithm used here is taken from "Lambert's Problem" by Kate Da
 """
 import numpy as np
 import math
+from scipy.optimize import newton
 
 class LamberSolverCartesian(object):
     """ """ 
     def __init__(self, initial_state, final_state):
-        if not isinstance(initial_state, 'Cartesian_State') or not isinstance(final_state, 'Cartesian_State'):
-            raise TypeError("The Lambert Cartesian Solver can only accept Cartesian_State objects")
+       # if not isinstance(initial_state, Cartesian_State) or not isinstance(final_state, Cartesian_State):
+        #    raise TypeError("The Lambert Cartesian Solver can only accept Cartesian_State objects")
         if not initial_state.mu == final_state.mu:
             raise ValueError("Both states MUST have the same gravitaional parameter: mu")
 
         self.i_state = initial_state
         self.f_state = final_state
 
-    def solve(self, delta_t_0):
-        x=1
+    def solve(self, delta_t_0, f_in_orb_seg=False):
+        """Solves laberts problem using only positions and a desire
+        
+        Args: 
+        delta_t_0 (float): 
+        f_in_orb_seg (bool): if false returns orbit segment that does not contain empty focus
+        
+        """
+        c = np.linalg.norm(self.i_state.pos - self.f_state.pos)
+        r_1 = np.linalg.norm(self.i_state.pos)
+        r_2 = np.linalg.norm(self.f_state.pos)
+        s = 1 / 2 * (r_1 + r_2 + c)
+
+        a_min = s / 2
+
+
+        # check for hyperbolic orbit
+        if f_in_orb_seg: 
+            delta_t_p = 1 / (6 * math.sqrt(self.i_state.mu)) * ((2*s)**(3/2) + (r_1 + r_2 - c)**(3/2))
+        else: 
+            delta_t_p = 1 / (6 * math.sqrt(self.i_state.mu)) * ((2*s)**(3/2) - (r_1 + r_2 - c)**(3/2))
+        
+        if delta_t_0 < delta_t_p:
+            category = 'Elliptic'
+        else:
+            category = 'Hyperbolic'
+
+        def alpha(a):
+            if f_in_orb_seg: 
+                return 2 * math.asin(math.sqrt(s / (2 * a)))
+            else:
+                return 2 * np.pi - 2 * math.asin(math.sqrt(s / (2 * a)))
+            
+        def beta(a):
+            if f_in_orb_seg: 
+                return 2 * math.asin(math.sqrt((s - c) / (2 * a)))
+            else:
+                return -2 * math.asin(math.sqrt((s - c) / (2 * a)))
+        
+        def lamberts_problem(a):
+            return a**(3 / 2) * (alpha(a) - beta(a) - (math.sin(alpha(a)) - math.sin(beta(a)))) - \
+                math.sqrt(self.i_state.mu) * delta_t_0
+
+        a = newton(lamberts_problem, a_min)
+            
+        # computing velocities:
+        A = math.sqrt(self.i_state.mu / (4 * a)) / math.tan(alpha(a) / 2)
+        B = math.sqrt(self.i_state.mu / (4 * a)) / math.tan(beta(a) / 2)
+            
+        c_hat = (self.f_state.pos - self.i_state.pos) / np.linalg.norm(self.f_state.pos - self.i_state.pos)
+        r_1hat = self.i_state.pos / np.linalg.norm(self.i_state.pos)
+        r_2hat = self.f_state.pos / np.linalg.norm(self.f_state.pos)
+        
+        v_1 = (B + A) * c_hat + (B - A) * r_1hat
+        v_2 = (B + A) * c_hat - (B - A) * r_2hat
+            
+        return {'category':category, 'v_1':v_1, 'v_2':v_2}
+        
+    def min_energy(self):
+        """Gives the minimum energy orbit (hohmann)
+
+        Returns: 
+        (float)
+        """
+        c = np.linalg.norm(self.i_state.pos - self.f_state.pos)
+        r_1 = np.linalg.norm(self.i_state.pos)
+        r_2 = np.linalg.norm(self.f_state.pos)
+        s = 1 / 2 * (r_1 + r_2 + c)
+
+        # at the minimum eccentrity major axis is parallel to chord, so:P
+        a_em = (r_1 + r_2) / 2
+
+        alpha = 2 * math.asin(math.sqrt(s / (2 * a_em)))
+        beta = 2 * math.asin(math.sqrt((s - c) / (2 * a_em)))
+        t_1 = 1 / (math.sqrt(self.i_state.mu)) * a_em**(3 / 2) * (alpha - beta - (math.sin(alpha) -
+                                                                                  math.sin(beta)))
+        
+        # modify alpha and beta to go the other way
+        beta *= -1
+        alpha = 2 * np.pi - alpha
+        t_2 = 1 / (math.sqrt(self.i_state.mu)) * a_em**(3 / 2) * (alpha - beta - (math.sin(alpha) -
+                                                                                  math.sin(beta)))
+
+        return {'a_em': a_em, 't_1': t_1 , 't_2': t_2} 
+
+    def min_eccentricity(self):
+        """ 
+        """
+
+        return
         
 
 class LambertSolverKeplerian(object):
@@ -43,7 +132,7 @@ class LambertSolverKeplerian(object):
     - Does not RUN solver until solve() method is called
     """
     def __init__(self, initial_state, final_state):
-        if not isinstance(initial_state, 'Keplerian_State') or not isinstance(final_state, 'Keplerian_State'):
+        if not isinstance(initial_state, Keplerian_State) or not isinstance(final_state, Keplerian_State):
             raise TypeError("The Lambert Solver can only accept Keplerian_State objects")
         if not initial_state.mu == final_state.mu:
             raise ValueError("Both states MUST have the same gravitaional parameter: mu")
@@ -57,7 +146,6 @@ class LambertSolverKeplerian(object):
 
         if self.A == 0 or self.delta_ecc_anom == 0:
             raise ValueError("Both A variable and delta_true_anom must NOT = 0")
-
 
     def solve(self, delta_t_0, direction_of_motion='Auto', thresh=1 * 10**-6):
         """Solves a single trajectory between the start and end states

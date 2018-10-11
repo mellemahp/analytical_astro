@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+"""Propagator Module 
+
+Author: Hunter Mellema
+Summary: provides a class to propagate, plot, and export trajectories
+
+"""
+import numpy as np
+from .states import *
+
+class PropagatorKeplerian(object):
+    """ """ 
+    def __init__(self, initial_state):
+        if  isinstance(initial_state, Cartesian_State):
+           self.initial_state = initial_state.to_kep_state()
+        elif isinstance(initial_state, Keplerian_State):
+            self.initial_state = initial_state
+        else:
+            raise TypeError("No valid type of state object was provided")
+
+        self.future_states = []
+
+    def propagate(self, end_time):
+        """
+        """
+        
+
+
+    def export(self): 
+        """ Exports state data to csv """
+
+
+class PropagatorCartesian(object):
+    """ """
+    def __init__(self, initial_state):
+        if  isinstance(initial_state, Cartesian_State):
+           self.initial_state = initial_state.to_kep_state()
+        else:
+            raise TypeError("No valid type of state object was provided")
