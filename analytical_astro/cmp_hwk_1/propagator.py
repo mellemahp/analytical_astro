@@ -132,4 +132,5 @@ class PropagatorCartesian(object):
              'Argument of Perigee': arg_peris, 'True anomaly': true_anoms, 'Energy': nrgs }
         df = pd.DataFrame(data=d)
         df.to_csv(filename, index_label='iters')
-        
+
+        return (times, radii, hs, incls, raans, eccs, arg_peris, true_anoms, nrgs)

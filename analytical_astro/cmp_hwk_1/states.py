@@ -8,6 +8,7 @@ propagating orbits in 2 body systems
 """
 import numpy as np
 import math
+import copy
 from scipy.optimize import newton
 from scipy.integrate import odeint
 
@@ -76,7 +77,7 @@ class Cartesian_State(object):
         # calculate node 
         node_vec = np.cross(np.array([0, 0, 1]), h_vec)
         node_mag = np.linalg.norm(node_vec)
-
+    
         # calculate raan 
         if node_mag == 0:
             # this is the circular orbit case
@@ -99,7 +100,7 @@ class Cartesian_State(object):
             arg_peri = math.acos(np.dot(node_vec / node_mag, ecc_vec / ecc))
         else:
             arg_peri = 2 * np.pi - math.acos(np.dot(node_vec / node_mag , ecc_vec / ecc))
-
+        
         # calculate true anomaly 
         if ecc == 0 or node_mag == 0:
             true_anomaly = np.nan
@@ -313,11 +314,11 @@ class Keplerian_State(object):
         Notes:
         - Does NOT work with non-zero eccentricity orbits
         """
-        if ecc != 0:
+        if self.ecc != 0:
             raise ValueError("This method ONLY works for ECC = 0!")
         mean_anomaly = self.n * (new_time - self.ts_peri)
 
-        new_state = self.copy()
+        new_state = copy.deepcopy(self)
         new_state.true_anom = mean_anomaly
         new_state.time = new_time
         return new_state
@@ -349,7 +350,7 @@ class Keplerian_State(object):
         # re-calculate true anomaly and radius at new time
         ta_new = 2 * math.atan2(math.tan(E_new / 2) , math.sqrt((1 - self.ecc) / (1 + self.ecc)))
 
-        r_new = self.h**2 / self.mu * 1 / ( 1 + self.ecc * math.cos(ta_new))
+        r_new = self.h**2 / self.mu / ( 1 + self.ecc * math.cos(ta_new))
         
         return Keplerian_State(r_new, self.h, self.incl, self.raan, self.ecc,
                                self.arg_peri, ta_new, self.mu, new_time)
